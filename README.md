@@ -15,9 +15,9 @@ See [examples/axum.rs](examples/axum.rs).
 % curl http://localhost:3000/me
 You're not signed in
 % curl -c cookie.txt -XPOST http://localhost:3000/signin
-% curl -b cookie.txt http://localhost:3000/me
+% curl -c cookie.txt -b cookie.txt http://localhost:3000/me
 Hello, eagletmt
-% curl -c cookie.txt -XPOST http://localhost:3000/signout
-% curl -b cookie.txt http://localhost:3000/me
+% curl -c cookie.txt -b cookie.txt -XPOST http://localhost:3000/signout
+% curl -c cookie.txt -b cookie.txt http://localhost:3000/me
 You're not signed in
 ```

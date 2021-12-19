@@ -298,6 +298,14 @@ where
             .expect("tower_cookie_store: internal mutex is poisoned");
         let inner = inner.borrow();
         if inner.state.is_empty() {
+            // Clear session cookie
+            let cookie = cookie::Cookie::build(this.store.name.clone(), "")
+                .max_age(time::Duration::seconds(0))
+                .finish();
+            res.headers_mut().append(
+                http::header::SET_COOKIE,
+                http::HeaderValue::from_str(&cookie.encoded().to_string()).unwrap(),
+            );
             return std::task::Poll::Ready(Ok(res));
         }
 
@@ -462,6 +470,9 @@ mod tests {
             .unwrap();
         let resp = build_app().oneshot(req).await.unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
-        assert_eq!(resp.headers().get(http::header::SET_COOKIE), None);
+        let cookie_header = resp.headers().get(http::header::SET_COOKIE).unwrap();
+        let cookie = cookie::Cookie::parse_encoded(cookie_header.to_str().unwrap()).unwrap();
+        assert_eq!(cookie.name(), "test-session");
+        assert_eq!(cookie.max_age(), Some(time::Duration::seconds(0)));
     }
 }
