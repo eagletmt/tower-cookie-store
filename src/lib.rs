@@ -389,9 +389,15 @@ mod tests {
                 }),
             )
             .route(
-                "/signout",
+                "/clear",
                 axum::routing::post(|session: super::Session| async move {
                     session.clear();
+                }),
+            )
+            .route(
+                "/remove",
+                axum::routing::post(|session: super::Session| async move {
+                    session.remove("user");
                 }),
             )
             .layer(
@@ -440,7 +446,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sign_out() {
+    async fn clear_session() {
         let req = http::Request::post("/signin")
             .body(axum::body::Body::empty())
             .unwrap();
@@ -465,7 +471,44 @@ mod tests {
         let body = hyper::body::to_bytes(resp.into_body()).await.unwrap();
         assert_eq!(body, "2-eagletmt");
 
-        let req = http::Request::post("/signout")
+        let req = http::Request::post("/clear")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = build_app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let cookie_header = resp.headers().get(http::header::SET_COOKIE).unwrap();
+        let cookie = cookie::Cookie::parse_encoded(cookie_header.to_str().unwrap()).unwrap();
+        assert_eq!(cookie.name(), "test-session");
+        assert_eq!(cookie.max_age(), Some(time::Duration::seconds(0)));
+    }
+
+    #[tokio::test]
+    async fn remove_session() {
+        let req = http::Request::post("/signin")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = build_app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let cookie_header = resp.headers().get(http::header::SET_COOKIE).unwrap();
+        let cookie = cookie::Cookie::parse_encoded(cookie_header.to_str().unwrap()).unwrap();
+        assert_eq!(cookie.name(), "test-session");
+        assert_eq!(cookie.secure(), Some(true));
+        assert_eq!(cookie.http_only(), Some(true));
+        assert_eq!(cookie.expires(), None);
+
+        let req = http::Request::get("/me")
+            .header(
+                http::header::COOKIE,
+                cookie.encoded().stripped().to_string(),
+            )
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = build_app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let body = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+        assert_eq!(body, "2-eagletmt");
+
+        let req = http::Request::post("/remove")
             .body(axum::body::Body::empty())
             .unwrap();
         let resp = build_app().oneshot(req).await.unwrap();
