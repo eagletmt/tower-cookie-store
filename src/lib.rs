@@ -104,7 +104,7 @@ struct CookieStoreInner {
     domain: Option<String>,
     http_only: Option<bool>,
     max_age: Option<time::Duration>,
-    path: Option<String>,
+    path: String,
     same_site: Option<cookie::SameSite>,
     secure: Option<bool>,
 }
@@ -146,7 +146,7 @@ impl CookieStoreLayer {
     where
         S: Into<String>,
     {
-        self.get_mut().path = Some(path.into());
+        self.get_mut().path = path.into();
         self
     }
 
@@ -169,7 +169,7 @@ impl CookieStoreInner {
             domain: None,
             http_only: None,
             max_age: None,
-            path: None,
+            path: "/".to_owned(),
             same_site: None,
             secure: None,
         }
@@ -300,6 +300,7 @@ where
         if inner.state.is_empty() {
             // Clear session cookie
             let cookie = cookie::Cookie::build(this.store.name.clone(), "")
+                .path(this.store.path.clone())
                 .max_age(time::Duration::seconds(0))
                 .finish();
             res.headers_mut().append(
@@ -317,7 +318,8 @@ where
             }
         };
         let mut jar = cookie::CookieJar::new();
-        let mut builder = cookie::Cookie::build(this.store.name.clone(), cookie_value);
+        let mut builder = cookie::Cookie::build(this.store.name.clone(), cookie_value)
+            .path(this.store.path.clone());
         if let Some(ref domain) = this.store.domain {
             builder = builder.domain(domain.to_owned());
         }
@@ -326,9 +328,6 @@ where
         }
         if let Some(max_age) = this.store.max_age {
             builder = builder.max_age(max_age);
-        }
-        if let Some(ref path) = this.store.path {
-            builder = builder.path(path.to_owned());
         }
         if let Some(same_site) = this.store.same_site {
             builder = builder.same_site(same_site);
@@ -479,6 +478,7 @@ mod tests {
         let cookie_header = resp.headers().get(http::header::SET_COOKIE).unwrap();
         let cookie = cookie::Cookie::parse_encoded(cookie_header.to_str().unwrap()).unwrap();
         assert_eq!(cookie.name(), "test-session");
+        assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.max_age(), Some(time::Duration::seconds(0)));
     }
 
@@ -516,6 +516,7 @@ mod tests {
         let cookie_header = resp.headers().get(http::header::SET_COOKIE).unwrap();
         let cookie = cookie::Cookie::parse_encoded(cookie_header.to_str().unwrap()).unwrap();
         assert_eq!(cookie.name(), "test-session");
+        assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.max_age(), Some(time::Duration::seconds(0)));
     }
 }
